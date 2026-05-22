@@ -52,16 +52,41 @@
     container.style.height = correctHeight + 'px';
     img.style.objectFit = '';
   }
+  
   function scanPictures() {
+    var fixed = 0;
     document.querySelectorAll('.rmwidget.widget-picture img').forEach(function(img) {
       if (img.complete && img.naturalWidth) {
         fixPictureContainer(img);
-      } else if (!img._fixListener) {
-        img._fixListener = true;
-        img.addEventListener('load', function() { fixPictureContainer(img); });
+        fixed++;
+      } else {
+        // Always attach listener in case we missed the load event
+        if (!img._fixListener) {
+          img._fixListener = true;
+          img.addEventListener('load', function() { fixPictureContainer(img); });
+          // Also handle cached images that might have fired load before listener
+          if (img.complete) {
+            setTimeout(function() { fixPictureContainer(img); }, 100);
+          }
+        }
       }
     });
+    return fixed;
   }
+  
+  // Retry with exponential backoff to catch late-loading images
+  function retryScan(attempts, delay) {
+    var fixed = scanPictures();
+    if (fixed > 0) {
+      // Some were fixed, run again to catch any missed
+      setTimeout(function() { scanPictures(); }, delay);
+    }
+    if (attempts > 0) {
+      setTimeout(function() { retryScan(attempts - 1, Math.min(delay * 1.5, 3000)); }, delay);
+    }
+  }
+  
+  // Watch for new widgets
   if (window.MutationObserver) {
     var target = document.getElementById('mags') || document.body;
     var observer = new MutationObserver(function() {
@@ -69,20 +94,40 @@
     });
     observer.observe(target, { childList: true, subtree: true });
   }
+  
+  // Initial scan + retries
+  setTimeout(function() { retryScan(20, 300); }, 500);
+  
+  // Final pass on load
+  window.addEventListener('load', function() {
+    setTimeout(function() { 
+      scanPictures();
+      // One more pass after images settle
+      setTimeout(scanPictures, 1000);
+      setTimeout(scanPictures, 3000);
+    }, 500);
+  });
+  
+  // Aggressive: also check periodically for all images
   var tries = 0;
   var interval = setInterval(function() {
-    scanPictures();
+    var allFixed = true;
+    document.querySelectorAll('.rmwidget.widget-picture img').forEach(function(img) {
+      if (img.complete && img.naturalWidth) {
+        fixPictureContainer(img);
+      } else {
+        allFixed = false;
+      }
+    });
+    if (allFixed && tries > 5) clearInterval(interval);
     if (++tries > 60) clearInterval(interval);
-  }, 500);
-  window.addEventListener('load', function() {
-    setTimeout(scanPictures, 500);
-    setTimeout(function() { clearInterval(interval); }, 1000);
-  });
+  }, 800);
+  
   if (document.readyState !== 'loading') {
-    setTimeout(scanPictures, 300);
+    setTimeout(scanPictures, 100);
   } else {
     document.addEventListener('DOMContentLoaded', function() {
-      setTimeout(scanPictures, 300);
+      setTimeout(scanPictures, 200);
     });
   }
 })();
