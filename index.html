@@ -151,12 +151,16 @@
       if (picData.length === 0) return;
 
       // Capture ORIGINAL positions (pre-transform, using gBCR / scale)
+      // BUT use DOM width for height calculation (gBCR width is post-transform)
       for (var i = 0; i < picData.length; i++) {
         var pd = picData[i];
         var rect = getOrigRect(pd.el, scale);
         pd.oTop = rect.top; pd.oLeft = rect.left;
         pd.oRight = rect.right; pd.oBottom = rect.bottom;
-        pd.oW = rect.width; pd.oH = rect.height;
+        pd.oH = rect.height;
+        // Use DOM width × scale for correct on-screen width
+        var domW = parseFloat(pd.el.style.width) || pd.el.offsetWidth || 320;
+        pd.oW = domW * scale;
       }
 
       // Sort by original top position (top to bottom)
@@ -186,11 +190,11 @@
         pd.el.style.height = correctH + 'px';
         pd.el.style.overflow = 'hidden';
 
-        // Image fills container
+        // Image fills container - use contain so full photo is visible
         if (info.type === 'img') {
           var imgEl = pd.el.querySelector('img.viewable');
           if (imgEl) {
-            imgEl.style.objectFit = 'cover';
+            imgEl.style.objectFit = 'contain';
             imgEl.style.width = '100%';
             imgEl.style.height = '100%';
             imgEl.style.position = 'absolute';
