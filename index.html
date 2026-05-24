@@ -151,16 +151,15 @@
       if (picData.length === 0) return;
 
       // Capture ORIGINAL positions (pre-transform, using gBCR / scale)
-      // BUT use DOM width for height calculation (gBCR width is post-transform)
+      // pd.oW = rect.width gives pre-transform width (gBCR / scale)
+      // This is correct because style.height is in pre-transform coords
       for (var i = 0; i < picData.length; i++) {
         var pd = picData[i];
         var rect = getOrigRect(pd.el, scale);
         pd.oTop = rect.top; pd.oLeft = rect.left;
         pd.oRight = rect.right; pd.oBottom = rect.bottom;
-        pd.oH = rect.height;
-        // Use DOM width × scale for correct on-screen width
-        var domW = parseFloat(pd.el.style.width) || pd.el.offsetWidth || 320;
-        pd.oW = domW * scale;
+        pd.oW = rect.width;  // pre-transform width
+        pd.oH = rect.height; // pre-transform height
       }
 
       // Sort by original top position (top to bottom)
